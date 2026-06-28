@@ -3,6 +3,13 @@
 Models tank thermal states, boil-off rates, and pressurization requirements.
 Uses ideal gas and Clausius-Clapeyron for vapor-liquid equilibrium.
 Pure math, zero external dependencies.
+
+LOX boils at 90.19 K (-182.96 °C). That's colder than Pluto's surface sometimes.
+LCH4 boils at 111.65 K (-161.50 °C). That's colder than Titan's lakes.
+
+The margin between them is 21.46 K.
+That margin is the difference between a rocket that works and a rocket that doesn't.
+We measure it to the hundredth of a degree.
 """
 
 import math
