@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.git
+.shadow_infrastructure/file_hashes.json
