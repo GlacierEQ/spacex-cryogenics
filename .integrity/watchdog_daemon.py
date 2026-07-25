@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Watchdog Daemon — spacex-cryogenics
 SHA-256 file integrity verification with tamper detection.
@@ -13,9 +14,11 @@ from typing import Dict
 class WatchdogDaemon:
     """Monitors file integrity via SHA-256 hashing."""
     
-    def __init__(self, repo_root: str = ".."):
-        self.repo_root = Path(repo_root)
-        self.hash_store = self.repo_root / ".shadow_infrastructure" / "file_hashes.json"
+    def __init__(self, repo_root: str | None = None):
+        # integrity dir is this file's parent; repo root is its parent
+        integrity_dir = Path(__file__).resolve().parent
+        self.repo_root = Path(repo_root).resolve() if repo_root else integrity_dir.parent
+        self.hash_store = integrity_dir / "file_hashes.json"
         self.baseline: Dict[str, str] = {}
         self._load_baseline()
     
