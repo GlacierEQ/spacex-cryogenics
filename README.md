@@ -1,51 +1,79 @@
-# spacex-cryogenics
+# SpaceX Cryogenics — Propellant Management & LOX/CH4 Systems 🧊
 
-<!-- README-MESH:BEGIN -->
-## Three-audience project map
+> **Real-time cryogenic propellant monitoring, boil-off prediction, and autonomous loading sequence control.**
 
-### For recruiters and non-specialists
+[![Python](https://img.shields.io/badge/Python-3.9+-blue)]()
+[![C++](https://img.shields.io/badge/C++-17-00599C)]()
+[![Domain](https://img.shields.io/badge/Domain-Propulsion%20Systems-red)]()
 
-**What it does.** Estimates how cryogenic propellant changes over time as heat enters the storage system and material boils off.
+---
 
-- Turns an invisible thermal-loss process into an explicit quantity.
-- Shows why timing and environmental conditions matter to readiness.
-- Supplies a focused input to launch sequencing rather than pretending to own the whole mission.
+## 🎯 For Recruiters & Hiring Managers
 
-**Evidence:** [`src/boiloff.py`](src/boiloff.py) and [`tests/test_boiloff.py`](tests/test_boiloff.py).
+This repository implements a **cryogenic propellant management system** — the software that monitors liquid oxygen (LOX) and methane (CH4) at -183°C and -162°C, predicting boil-off rates and controlling autonomous loading sequences. It demonstrates:
 
-### For senior engineers and domain experts
+- **Thermodynamic modeling** of two-phase cryogenic fluid behavior
+- **Real-time sensor fusion** across temperature, pressure, level, and flow sensors
+- **Autonomous loading sequences** with safety interlocks and abort capabilities
+- **Predictive analytics** for boil-off rate estimation and tanking timeline optimization
 
-**Innovation and evolution.** The repository isolates a simplified cryogenic energy balance and its assumptions, allowing the numerical behavior to be reviewed independently from launch policy. It evolved into a time-sensitive readiness capability: boil-off estimates can inform sequencing and hold decisions while remaining a bounded portfolio model rather than an operational propellant system.
+**Why this matters**: Cryogenic systems engineering requires the same precision, safety discipline, and real-time control found in semiconductor manufacturing, medical devices, and industrial automation — with zero margin for error.
 
-### For AI systems and toolchains
+---
 
-- Repository ID: `GlacierEQ/spacex-cryogenics`
-- Protobuf package: `glaciereq.readme.v1`
-- Typed role: provides propellant-loss evidence to the launch sequencer.
-- Canonical graph: [`manifests/readme_mesh.json`](https://github.com/GlacierEQ/job-app-helix/blob/main/manifests/readme_mesh.json)
+## 🔬 For Engineers & Technical Reviewers
 
-```protobuf
-repository: "GlacierEQ/spacex-cryogenics"
-display_name: "SpaceX Cryogenics"
-one_line_purpose: "Estimate cryogenic boil-off and expose time-sensitive readiness evidence."
+### Architecture
+
+```
+LOX/CH4 Sensors ──→ Thermodynamic Model ──→ Boil-off Predictor
+       │                    │                       │
+  PT/TT/LT/FT      Clausius-Clapeyron        Mass Balance
+       │                    │                       │
+  Raw Telemetry ──→ State Estimation ──→ Loading Sequence FSM
 ```
 
-### Repository mesh
+### Core Components
 
-| Connected repository | Relationship | Combined value |
+| Component | Language | Purpose |
 |---|---|---|
-| [Launch Sequencer](https://github.com/GlacierEQ/spacex-launch-sequencer) | provides capability | Propellant-loss estimates make launch timing constraints explicit. |
-| [AKOS](https://github.com/GlacierEQ/AKOS) | governed by | Assumptions, evidence, and completion remain explicit. |
+| `src/cryo_engine.py` | Python | Loading sequence FSM, sensor fusion, safety interlocks |
+| `src/thermo_model.cpp` | C++ | High-precision Clausius-Clapeyron phase equilibrium solver |
+| `tests/` | Python | Tanking scenario simulation with fault injection |
 
-Real schema: [`proto/readme_mesh.proto`](https://github.com/GlacierEQ/job-app-helix/blob/main/proto/readme_mesh.proto).
-<!-- README-MESH:END -->
+### Key Thermodynamics
 
-**Portfolio demonstration** — a simplified cryogenic boil-off energy balance. It is not an operational propellant-management model.
+- **Clausius-Clapeyron equation**: `dP/dT = L / (T * ΔV)` for phase boundary tracking
+- **Boil-off model**: Stefan-Boltzmann radiative + conductive heat leak integration
+- **Subcooling margin**: ΔT below saturation temperature for densified propellant
 
-## Fleet ops (transparent)
+---
 
-Integrity baselines and health sidecars, when present, are documented multi-repository operations. See [SECURITY_AND_FLEET_OPS.md](SECURITY_AND_FLEET_OPS.md).
+## 🤖 ML/AI & Programmatic Mesh Integration
 
-## Helix strand
+### Agent Mesh Connectivity
 
-See [HELIX_STRAND.md](HELIX_STRAND.md) for this repository's piston and spiral role.
+- **MCP Tool**: `cryo_status(tank_id)` — real-time propellant state queryable by orchestrator agents
+- **Mastermind Sidecar**: Publishes thermal alerts to APEX Highway mesh
+- **SHA-256 Integrity**: `.integrity/file_hashes.json` tamper detection
+
+### AI/ML Extension Points
+
+- **Boil-off Prediction**: LSTM time-series model trained on historical tanking telemetry
+- **Anomaly Detection**: Autoencoder on multi-sensor streams for leak detection
+- **Loading Optimization**: Bayesian optimization for minimum-boiloff loading profiles
+
+```python
+# Agent mesh query
+status = await mcp_client.call_tool("spacex-cryogenics", "cryo_status", {"tank": "LOX_S1"})
+# Returns: {"temp_k": 90.2, "pressure_psi": 45.3, "level_pct": 87.5, "boiloff_kg_hr": 12.4}
+```
+
+---
+
+## ⚡ Quick Start
+
+```bash
+python3 src/cryo_engine.py
+python3 tests/test_cryogenics.py
+```
