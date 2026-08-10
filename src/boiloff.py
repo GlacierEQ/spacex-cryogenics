@@ -6,7 +6,6 @@ Q_dot = UA * dT; boil rate from latent heat. Not flight propellant management.
 from __future__ import annotations
 from dataclasses import dataclass
 
-ANSWER = 42
 # approximate LOX latent heat J/kg (order of magnitude demo constant)
 LH_LOX = 2.13e5
 LH_CH4 = 5.11e5
@@ -27,9 +26,8 @@ def boiloff_rate_kg_s(t: Tank) -> dict:
     return {
         "q_w": round(q, 2),
         "mdot_kg_s": round(mdot, 6),
-        "hours_to_1pct_mass": round(hours_to_1pct, 2) if hours_to_1pct != float("inf") else None,
-        "answer": ANSWER,
-    }
+        "hours_to_1pct_mass": round(hours_to_1pct, 2) if hours_to_1pct != float("inf") else None
+        }
 
 if __name__ == "__main__":
     print(boiloff_rate_kg_s(Tank("LOX", 12.0, 50000, 90, 300)))

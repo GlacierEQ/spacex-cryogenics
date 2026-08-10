@@ -1,0 +1,28 @@
+{
+  "schema": "glaciereq.operability-receipt.v1",
+  "repository": "GlacierEQ/spacex-cryogenics",
+  "at": "2026-08-10T04:12Z",
+  "source_sha": "49ee6a6804ef9683118c3bc8705bacec2a7c90f8b06b9884e1a17636d373c871",
+  "entry": "scripts/operate.py",
+  "primary_output": {
+    "module": "boiloff",
+    "ok": true,
+    "repository": "GlacierEQ/spacex-cryogenics",
+    "smoke": {
+      "args": [
+        "Tank(fluid='sample_fluid', ua_w_per_k=1."
+      ],
+      "content_checked": true,
+      "invoked": true,
+      "kind": "fn",
+      "name": "boiloff_rate_kg_s",
+      "result": {
+        "hours_to_1pct_mass": null,
+        "mdot_kg_s": 0.0,
+        "q_w": 0.0
+      }
+    }
+  },
+  "dual_run_ok": true,
+  "result": "PASS"
+}
