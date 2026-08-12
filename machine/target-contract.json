@@ -1,22 +1,36 @@
 {
-  "schema": "glaciereq.repo-target-contract.v1",
-  "identity": {
-    "repository_id": "GlacierEQ/spacex-cryogenics",
-    "family": "elite-estate"
-  },
+  "schema": "glaciereq.repo-target-contract.v2",
+  "repository": "GlacierEQ/spacex-cryogenics",
+  "purpose": "deterministic cryogenic propellant digital-twin simulation",
   "current": {
-    "state": "PROMOTED",
+    "state": "FUNCTIONAL_CANDIDATE",
     "implemented": true,
-    "tested": true,
+    "exact_head_native_ci_verified": false,
     "deployed": false
   },
-  "nonclaims": [
-    "no employer affiliation",
-    "no production deployment without receipt"
+  "required_capabilities": [
+    "si-consistent-cryogenic-thermodynamics",
+    "heat-leak-and-boiloff-simulation",
+    "bounded-tank-controller-digital-twin",
+    "sensor-residual-validation",
+    "predictive-multi-tank-boiloff",
+    "same-propellant-balance-review-planning",
+    "python-json-digital-twin-cli",
+    "cpp17-thermodynamic-reference-model"
   ],
-  "donor_plan": {
-    "mode": "none",
-    "donors": []
-  },
-  "frozen_at": "2026-08-10T04:12Z"
+  "promotion_requires": [
+    "Python 3.11 functional proof",
+    "Python 3.12 functional proof",
+    "Python 3.13 functional proof",
+    "C++17 compile and self-test",
+    "required-functional-proof"
+  ],
+  "nonclaims": [
+    "no SpaceX affiliation",
+    "no flight certification",
+    "no hardware I/O",
+    "no operational valve or loading authority",
+    "no live MCP or APEX integration",
+    "no trained LSTM or autoencoder model"
+  ]
 }
