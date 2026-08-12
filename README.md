@@ -1,79 +1,105 @@
-# SpaceX Cryogenics — Propellant Management & LOX/CH4 Systems 🧊
+# Cryogenic Propellant Digital Twin
 
-> **Real-time cryogenic propellant monitoring, boil-off prediction, and autonomous loading sequence control.**
+**Deterministic LOX/LCH4/LH2 thermodynamics, boil-off prediction, tank-state simulation, and review-level balance planning.**
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue)]()
-[![C++](https://img.shields.io/badge/C++-17-00599C)]()
-[![Domain](https://img.shields.io/badge/Domain-Propulsion%20Systems-red)]()
+This is an independent GlacierEQ portfolio system. It is not affiliated with SpaceX. It provides no flight certification, hardware control, valve actuation, loading authority, or operational launch-vehicle interface.
 
----
+## What now works
 
-## 🎯 For Recruiters & Hiring Managers
+- SI-consistent fluid properties and ideal-gas ullage calculations;
+- Clausius-Clapeyron saturation pressure anchored at each fluid's normal boiling point;
+- saturation-temperature inversion and subcooling margins;
+- conductive/radiative heat-leak and latent-heat boil-off calculations;
+- deterministic tank-controller simulation with mutually exclusive fill/drain valves, bounded pressure targets, alerts, vent/emergency state, draining and thermal evolution;
+- sensor-frame residual validation that does not silently overwrite simulated state;
+- predictive boil-off integration over multiple horizons;
+- same-propellant balance review that correctly moves mass from the fuller tank toward the emptier tank;
+- executable `cryo-twin` JSON CLI;
+- independent C++17 thermodynamic reference executable with native self-tests.
 
-This repository implements a **cryogenic propellant management system** — the software that monitors liquid oxygen (LOX) and methane (CH4) at -183°C and -162°C, predicting boil-off rates and controlling autonomous loading sequences. It demonstrates:
-
-- **Thermodynamic modeling** of two-phase cryogenic fluid behavior
-- **Real-time sensor fusion** across temperature, pressure, level, and flow sensors
-- **Autonomous loading sequences** with safety interlocks and abort capabilities
-- **Predictive analytics** for boil-off rate estimation and tanking timeline optimization
-
-**Why this matters**: Cryogenic systems engineering requires the same precision, safety discipline, and real-time control found in semiconductor manufacturing, medical devices, and industrial automation — with zero margin for error.
-
----
-
-## 🔬 For Engineers & Technical Reviewers
-
-### Architecture
-
-```
-LOX/CH4 Sensors ──→ Thermodynamic Model ──→ Boil-off Predictor
-       │                    │                       │
-  PT/TT/LT/FT      Clausius-Clapeyron        Mass Balance
-       │                    │                       │
-  Raw Telemetry ──→ State Estimation ──→ Loading Sequence FSM
-```
-
-### Core Components
-
-| Component | Language | Purpose |
-|---|---|---|
-| `src/cryo_engine.py` | Python | Loading sequence FSM, sensor fusion, safety interlocks |
-| `src/thermo_model.cpp` | C++ | High-precision Clausius-Clapeyron phase equilibrium solver |
-| `tests/` | Python | Tanking scenario simulation with fault injection |
-
-### Key Thermodynamics
-
-- **Clausius-Clapeyron equation**: `dP/dT = L / (T * ΔV)` for phase boundary tracking
-- **Boil-off model**: Stefan-Boltzmann radiative + conductive heat leak integration
-- **Subcooling margin**: ΔT below saturation temperature for densified propellant
-
----
-
-## 🤖 ML/AI & Programmatic Mesh Integration
-
-### Agent Mesh Connectivity
-
-- **MCP Tool**: `cryo_status(tank_id)` — real-time propellant state queryable by orchestrator agents
-- **Mastermind Sidecar**: Publishes thermal alerts to APEX Highway mesh
-- **SHA-256 Integrity**: `.integrity/file_hashes.json` tamper detection
-
-### AI/ML Extension Points
-
-- **Boil-off Prediction**: LSTM time-series model trained on historical tanking telemetry
-- **Anomaly Detection**: Autoencoder on multi-sensor streams for leak detection
-- **Loading Optimization**: Bayesian optimization for minimum-boiloff loading profiles
-
-```python
-# Agent mesh query
-status = await mcp_client.call_tool("spacex-cryogenics", "cryo_status", {"tank": "LOX_S1"})
-# Returns: {"temp_k": 90.2, "pressure_psi": 45.3, "level_pct": 87.5, "boiloff_kg_hr": 12.4}
-```
-
----
-
-## ⚡ Quick Start
+## Run it
 
 ```bash
-python3 src/cryo_engine.py
-python3 tests/test_cryogenics.py
+python -m pip install -e . pytest
+pytest -q
+cryo-twin demo
+
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic src/thermo_model.cpp -o /tmp/cryo-thermo
+/tmp/cryo-thermo
 ```
+
+## Architecture
+
+```text
+Tank geometry + fluid properties
+            |
+            v
+   SI thermodynamics ---------> C++17 reference model
+            |
+            +--> heat leak --> boil-off --> forward predictor
+            |
+Sensor frame +--> residual validation
+            |
+            v
+   Tank-controller digital twin
+            |
+            +--> bounded review states / alerts
+            +--> deterministic JSON status
+            +--> multi-tank balance review
+```
+
+## Core surfaces
+
+| Surface | Function |
+|---|---|
+| `src/alpha/thermodynamics.py` | saturation, ullage, heat transfer, boil-off, pressurization and subcooling math |
+| `src/omega/tank_controller.py` | bounded deterministic tank state machine and safety observations |
+| `src/omega/predictive_boiloff.py` | forward thermal prediction and same-fluid balance review |
+| `src/cryo_engine.py` | executable digital twin, sensor validation and JSON CLI |
+| `src/thermo_model.cpp` | independent C++17 thermodynamic reference and self-test executable |
+| `tests/test_crystallized_function.py` | physical anchors, units, prediction, transfer direction, interlocks, sensors and CLI truth boundary |
+
+## Important corrections
+
+The previous repository claimed functionality that the shipped code did not justify. The crystallized implementation corrects those mismatches:
+
+- the previous Python saturation model referenced half the critical pressure at the normal boiling point; it is now anchored to **101,325 Pa**;
+- molar-mass / specific-gas-constant units are now explicit SI values instead of g/mol-like values used as kg/mol;
+- predictive balance no longer proposes mass transfer from the emptier tank into the fuller tank;
+- time-to-loss reporting is actually converted from seconds to hours;
+- the README's previously missing `src/cryo_engine.py` now exists and executes;
+- the C++ source is now a buildable C++17 executable with native self-verification;
+- generic `hyper-scaling` metadata is gone.
+
+## Model limits
+
+These are engineering simulation models, not NIST-grade property tables or a replacement for validated EOS/REFPROP/mission-certified thermodynamics. The phase model is an anchored Clausius-Clapeyron approximation, the tank controller is a local digital twin, and transfer output is a review proposal only.
+
+There is currently **no** live MCP tool, APEX event bus, autonomous physical loading system, LSTM predictor, autoencoder leak detector, or Bayesian loading optimizer in this repository. Those claims are intentionally absent until executable evidence exists.
+
+## Machine contract
+
+```yaml
+schema: glaciereq.readme.v1
+repository: GlacierEQ/spacex-cryogenics
+purpose: deterministic cryogenic propellant digital-twin simulation
+state: FUNCTIONAL_CANDIDATE
+languages:
+  python:
+    role: thermodynamics, controller simulation, prediction, sensor review, CLI
+  cpp17:
+    role: independent thermodynamic reference and native self-test
+promotion_requires:
+  - Python 3.11 functional proof
+  - Python 3.12 functional proof
+  - Python 3.13 functional proof
+  - C++17 compile and native self-test
+  - required-functional-proof
+nonclaims:
+  - no SpaceX affiliation
+  - no flight authority
+  - no hardware I/O
+  - no live MCP or APEX integration
+```
+
+**Green metadata is not the product. Executable thermodynamics and observable behavior are the product.**
