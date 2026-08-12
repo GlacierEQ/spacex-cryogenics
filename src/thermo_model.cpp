@@ -3,11 +3,9 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
-#include <string>
 
 namespace cryo {
 constexpr double R_UNIVERSAL = 8.31446261815324; // J/(mol K)
@@ -167,7 +165,7 @@ int self_test() {
 }
 } // namespace cryo
 
-int main(int argc, char** argv) {
+int main() {
     const int result = cryo::self_test();
     if (result != 0) {
         std::cerr << "self-test failed: " << result << '\n';
