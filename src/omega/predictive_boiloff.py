@@ -1,30 +1,29 @@
-"""Predictive boil-off management — preemptive propellant transfer.
+"""Predictive boil-off and multi-tank balance simulation.
 
-Standard cryogenics: monitor tank temperatures, vent when pressure rises.
-Innovation: Predict WHICH tank will boil off first and preemptively
-transfer propellant to maintain balance. Prevents the problem instead
-of reacting to it.
-
-The wheel: boil-off rate computation
-The vehicle: predictive load balancing across tanks
-
-Key insight: In a multi-tank system (Starship has 6 tanks), boil-off
-isn't uniform. Solar heating, attitude, and tank geometry cause uneven
-boil-off. If one tank boils faster, the vehicle becomes unbalanced.
-Predicting this 30 minutes ahead and transferring propellant prevents
-the imbalance entirely.
+This module predicts local digital-twin states and emits review plans.  It does
+not actuate valves or claim operational launch-vehicle authority.
 """
+from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
+from alpha.thermodynamics import PROPELLANTS, Propellant
 
-R_UNIVERSAL = 8.314
 STEFAN_BOLTZMANN = 5.670374419e-8
 
 
-@dataclass
+def _propellant(name: str) -> Propellant:
+    normalized = name.strip().upper()
+    aliases = {"LOX": Propellant.LOX, "LCH4": Propellant.LCH4, "CH4": Propellant.LCH4, "LH2": Propellant.LH2}
+    try:
+        return aliases[normalized]
+    except KeyError as exc:
+        raise ValueError(f"unsupported propellant: {name}") from exc
+
+
+@dataclass(frozen=True)
 class CryoTank:
     tank_id: str
     propellant: str
@@ -35,34 +34,50 @@ class CryoTank:
     solar_exposure_factor: float = 0.5
     insulation_u_w_m2k: float = 0.01
 
+    def __post_init__(self) -> None:
+        if not self.tank_id.strip():
+            raise ValueError("tank_id is required")
+        _propellant(self.propellant)
+        if not math.isfinite(self.volume_m3) or self.volume_m3 <= 0:
+            raise ValueError("volume_m3 must be finite and > 0")
+        if not 0.0 <= self.fill_percent <= 1.0:
+            raise ValueError("fill_percent must be in [0, 1]")
+        if self.temperature_k <= 0 or self.pressure_pa <= 0:
+            raise ValueError("temperature and pressure must be > 0")
+        if not 0.0 <= self.solar_exposure_factor <= 1.0:
+            raise ValueError("solar_exposure_factor must be in [0, 1]")
+        if self.insulation_u_w_m2k < 0:
+            raise ValueError("insulation_u_w_m2k must be >= 0")
+
+    @property
+    def properties(self):
+        return PROPELLANTS[_propellant(self.propellant)]
+
     @property
     def liquid_mass_kg(self) -> float:
-        density = 1141.0 if self.propellant == "LOX" else 422.6
-        return self.fill_percent * self.volume_m3 * density
+        return self.fill_percent * self.volume_m3 * self.properties.density_liquid_kg_m3
 
     @property
     def ullage_volume_m3(self) -> float:
-        return (1 - self.fill_percent) * self.volume_m3
+        return (1.0 - self.fill_percent) * self.volume_m3
 
     @property
     def boil_off_rate_kgs(self) -> float:
-        latent_heat = 213100 if self.propellant == "LOX" else 510000
-        heat_input = self._heat_input_watts()
-        return heat_input / latent_heat if latent_heat > 0 else 0
+        return max(0.0, self._heat_input_watts()) / self.properties.latent_heat_jkg
 
     def _heat_input_watts(self) -> float:
-        surface_area = self._surface_area_m2()
-        conduction = surface_area * self.insulation_u_w_m2k * (300 - self.temperature_k)
-        solar = surface_area * self.solar_exposure_factor * 1361 * 0.1
-        radiation = STEFAN_BOLTZMANN * surface_area * 0.85 * (300 ** 4 - self.temperature_k ** 4)
+        area = self._surface_area_m2()
+        conduction = area * self.insulation_u_w_m2k * max(0.0, 300.0 - self.temperature_k)
+        solar = area * self.solar_exposure_factor * 1361.0 * 0.10
+        radiation = STEFAN_BOLTZMANN * area * 0.05 * max(0.0, 300.0**4 - self.temperature_k**4)
         return conduction + solar + radiation
 
     def _surface_area_m2(self) -> float:
-        r = math.sqrt(self.volume_m3 / (4 * math.pi / 3))
-        return 4 * math.pi * r ** 2
+        radius = (3.0 * self.volume_m3 / (4.0 * math.pi)) ** (1.0 / 3.0)
+        return 4.0 * math.pi * radius**2
 
 
-@dataclass
+@dataclass(frozen=True)
 class TransferPlan:
     from_tank: str
     to_tank: str
@@ -70,9 +85,10 @@ class TransferPlan:
     duration_s: float
     reason: str
     balance_improvement: float
+    operational_authority: bool = False
 
 
-@dataclass
+@dataclass(frozen=True)
 class PredictedState:
     tank_id: str
     time_s: float
@@ -83,204 +99,146 @@ class PredictedState:
 
 
 class ThermalModeler:
-    """Predicts tank thermal evolution over time.
+    """Forward-integrates heat leak, liquid loss, and ideal-gas ullage pressure."""
 
-    Innovation: Instead of just computing current boil-off rate,
-    integrates forward in time to predict FUTURE state. This enables
-    preemptive action.
-    """
-
-    def __init__(self):
-        self.gravity = 9.80665
-
-    def predict_state(
-        self,
-        tank: CryoTank,
-        time_s: float,
-        dt: float = 60.0,
-    ) -> PredictedState:
+    def predict_state(self, tank: CryoTank, time_s: float, dt: float = 60.0) -> PredictedState:
+        if time_s < 0 or dt <= 0 or not math.isfinite(time_s) or not math.isfinite(dt):
+            raise ValueError("time_s must be >= 0 and dt must be > 0")
+        props = tank.properties
         fill = tank.fill_percent
         temp = tank.temperature_k
         pressure = tank.pressure_pa
         total_boil = 0.0
+        elapsed = 0.0
 
-        steps = int(time_s / dt)
-        for _ in range(steps):
-            heat_input = tank._heat_input_watts()
-            latent_heat = 213100 if tank.propellant == "LOX" else 510000
-            boil_rate = heat_input / latent_heat if latent_heat > 0 else 0
+        while elapsed < time_s and fill > 0.0:
+            step = min(dt, time_s - elapsed)
+            area = tank._surface_area_m2()
+            heat = (
+                area * tank.insulation_u_w_m2k * max(0.0, 300.0 - temp)
+                + area * tank.solar_exposure_factor * 1361.0 * 0.10
+                + STEFAN_BOLTZMANN * area * 0.05 * max(0.0, 300.0**4 - temp**4)
+            )
+            boil_mass = heat / props.latent_heat_jkg * step
+            liquid_mass = fill * tank.volume_m3 * props.density_liquid_kg_m3
+            actual_boil = min(liquid_mass, boil_mass)
+            total_boil += actual_boil
+            liquid_mass -= actual_boil
+            fill = liquid_mass / (tank.volume_m3 * props.density_liquid_kg_m3)
+            ullage = max((1.0 - fill) * tank.volume_m3, 1e-9)
 
-            boil_mass = boil_rate * dt
-            total_boil += boil_mass
+            # Sensible heating is limited to the remaining liquid; phase change
+            # already consumes the dominant latent-heat term.
+            sensible_fraction = 0.02
+            if liquid_mass > 0:
+                temp += sensible_fraction * heat * step / (liquid_mass * props.cp_liquid_j_kg_k)
 
-            density = 1141.0 if tank.propellant == "LOX" else 422.6
-            liquid_mass = fill * tank.volume_m3 * density
-            new_liquid_mass = max(0, liquid_mass - boil_mass)
-            fill = new_liquid_mass / (tank.volume_m3 * density) if tank.volume_m3 * density > 0 else 0
+            vapor_mass = max(0.0, pressure * tank.ullage_volume_m3 / (props.specific_gas_constant_j_kg_k * tank.temperature_k)) + total_boil
+            pressure = vapor_mass * props.specific_gas_constant_j_kg_k * temp / ullage
+            elapsed += step
 
-            molecular_weight = 32.0 if tank.propellant == "LOX" else 16.0
-            R = R_UNIVERSAL / molecular_weight
-            n = pressure * tank.ullage_volume_m3 / (R * temp) if tank.ullage_volume_m3 > 0 else 0
-            dTdt = heat_input / (n * R * 1.5) if n > 0 else 0
-            temp += dTdt * dt
-            pressure = n * R * temp / tank.ullage_volume_m3 if tank.ullage_volume_m3 > 0 else pressure
-
-        return PredictedState(
-            tank_id=tank.tank_id,
-            time_s=time_s,
-            predicted_fill_percent=fill,
-            predicted_temperature_k=temp,
-            predicted_pressure_pa=pressure,
-            boil_off_kg=total_boil,
-        )
+        return PredictedState(tank.tank_id, time_s, fill, temp, pressure, total_boil)
 
 
 class BalancePredictor:
-    """Predicts and prevents tank imbalance.
-
-    Innovation: Monitors the fill level differences across all tanks
-    and predicts when imbalance will exceed safe limits. Then computes
-    optimal transfer plan to restore balance before it becomes critical.
-    """
-
-    def __init__(self, imbalance_threshold: float = 0.05):
+    def __init__(self, imbalance_threshold: float = 0.05, transfer_flow_kg_s: float = 50.0):
+        if not 0.0 < imbalance_threshold < 1.0 or transfer_flow_kg_s <= 0:
+            raise ValueError("invalid predictor thresholds")
         self.imbalance_threshold = imbalance_threshold
+        self.transfer_flow_kg_s = transfer_flow_kg_s
 
     def compute_imbalance(self, tanks: list[CryoTank]) -> dict:
-        fills = {t.tank_id: t.fill_percent for t in tanks}
-        if not fills:
-            return {"imbalance": 0, "max_diff": 0}
-
+        if not tanks:
+            return {"imbalance": 0.0, "max_diff": 0.0, "tanks": {}}
+        fills = {tank.tank_id: tank.fill_percent for tank in tanks}
         mean_fill = sum(fills.values()) / len(fills)
-        max_diff = max(abs(f - mean_fill) for f in fills.values())
-        worst_tank = max(fills, key=lambda k: fills[k])
-        best_tank = min(fills, key=lambda k: fills[k])
-
+        fullest = max(fills, key=fills.get)
+        emptiest = min(fills, key=fills.get)
+        spread = fills[fullest] - fills[emptiest]
         return {
-            "imbalance": max_diff,
-            "max_diff": max_diff,
+            "imbalance": spread,
+            "max_diff": spread,
             "mean_fill": mean_fill,
-            "worst_tank": worst_tank,
-            "best_tank": best_tank,
+            "fullest_tank": fullest,
+            "emptiest_tank": emptiest,
+            # Compatibility names retained, now with unambiguous semantics.
+            "worst_tank": fullest,
+            "best_tank": emptiest,
             "tanks": fills,
         }
 
-    def predict_imbalance_at(
-        self,
-        tanks: list[CryoTank],
-        modeler: ThermalModeler,
-        time_s: float,
-    ) -> dict:
-        predicted_fills = {}
-        for tank in tanks:
-            predicted = modeler.predict_state(tank, time_s)
-            predicted_fills[tank.tank_id] = predicted.predicted_fill_percent
+    def predict_imbalance_at(self, tanks: list[CryoTank], modeler: ThermalModeler, time_s: float) -> dict:
+        predicted = {tank.tank_id: modeler.predict_state(tank, time_s).predicted_fill_percent for tank in tanks}
+        if not predicted:
+            return {"time_s": time_s, "imbalance": 0.0, "predicted_fills": {}, "exceeds_threshold": False}
+        spread = max(predicted.values()) - min(predicted.values())
+        return {"time_s": time_s, "imbalance": spread, "predicted_fills": predicted, "exceeds_threshold": spread > self.imbalance_threshold}
 
-        if not predicted_fills:
-            return {"imbalance": 0}
-
-        mean_fill = sum(predicted_fills.values()) / len(predicted_fills)
-        max_diff = max(abs(f - mean_fill) for f in predicted_fills.values())
-
-        return {
-            "time_s": time_s,
-            "imbalance": max_diff,
-            "predicted_fills": predicted_fills,
-            "exceeds_threshold": max_diff > self.imbalance_threshold,
-        }
-
-    def plan_transfer(
-        self,
-        tanks: list[CryoTank],
-    ) -> Optional[TransferPlan]:
-        imbalance = self.compute_imbalance(tanks)
-        if imbalance["imbalance"] <= self.imbalance_threshold:
+    def plan_transfer(self, tanks: list[CryoTank]) -> Optional[TransferPlan]:
+        state = self.compute_imbalance(tanks)
+        if state["imbalance"] <= self.imbalance_threshold:
+            return None
+        source_id, destination_id = state["fullest_tank"], state["emptiest_tank"]
+        source = next(t for t in tanks if t.tank_id == source_id)
+        destination = next(t for t in tanks if t.tank_id == destination_id)
+        if _propellant(source.propellant) is not _propellant(destination.propellant):
             return None
 
-        from_tank = imbalance["best_tank"]
-        to_tank = imbalance["worst_tank"]
-
-        from_t = next((t for t in tanks if t.tank_id == from_tank), None)
-        to_t = next((t for t in tanks if t.tank_id == to_tank), None)
-
-        if not from_t or not to_t:
+        props = source.properties
+        source_excess_fraction = max(0.0, (source.fill_percent - destination.fill_percent) / 2.0)
+        source_excess_mass = source_excess_fraction * source.volume_m3 * props.density_liquid_kg_m3
+        destination_capacity_mass = (1.0 - destination.fill_percent) * destination.volume_m3 * props.density_liquid_kg_m3
+        transfer_mass = min(source_excess_mass, destination_capacity_mass)
+        if transfer_mass <= 0.0:
             return None
-
-        transfer_mass = (from_t.fill_percent - to_t.fill_percent) * from_t.volume_m3 * 422.6 * 0.3
-        flow_rate = 50.0
-        duration = transfer_mass / flow_rate if flow_rate > 0 else 0
-
+        duration = transfer_mass / self.transfer_flow_kg_s
         return TransferPlan(
-            from_tank=from_tank,
-            to_tank=to_tank,
-            mass_kg=transfer_mass,
-            duration_s=duration,
-            reason=f"Imbalance {imbalance['imbalance']:.3f} exceeds threshold {self.imbalance_threshold}",
-            balance_improvement=imbalance["imbalance"] * 0.6,
+            source_id,
+            destination_id,
+            transfer_mass,
+            duration,
+            f"fill spread {state['imbalance']:.4f} exceeds threshold {self.imbalance_threshold:.4f}",
+            min(state["imbalance"], 2.0 * transfer_mass / (source.volume_m3 * props.density_liquid_kg_m3)),
         )
 
 
 class PredictiveBoiloffManager:
-    """Full predictive boil-off management system.
-
-    The wheel: boil-off rate computation
-    The vehicle: preemptive propellant transfer
-
-    Innovation: Instead of reacting to boil-off (venting pressure),
-    predicts WHICH tanks will boil off fastest and preemptively
-    transfers propellant to maintain balance. Prevents the problem
-    instead of managing the symptoms.
-    """
-
     def __init__(self):
         self.modeler = ThermalModeler()
         self.balance_predictor = BalancePredictor()
-        self._transfer_log: list[dict] = []
-        self._prediction_log: list[dict] = []
 
     def analyze_tanks(self, tanks: list[CryoTank]) -> dict:
         balance = self.balance_predictor.compute_imbalance(tanks)
-        predictions = {}
-
-        for horizon_s in [1800, 3600, 7200]:
-            pred = self.balance_predictor.predict_imbalance_at(
-                tanks, self.modeler, horizon_s
-            )
-            predictions[f"{horizon_s // 60}min"] = pred
-
-        transfer_plan = self.balance_predictor.plan_transfer(tanks)
-
+        predictions = {
+            f"{horizon // 60}min": self.balance_predictor.predict_imbalance_at(tanks, self.modeler, horizon)
+            for horizon in (1800, 3600, 7200)
+        }
+        plan = self.balance_predictor.plan_transfer(tanks)
         return {
             "current_balance": balance,
             "predictions": predictions,
-            "transfer_plan": {
-                "from": transfer_plan.from_tank,
-                "to": transfer_plan.to_tank,
-                "mass_kg": transfer_plan.mass_kg,
-                "duration_s": transfer_plan.duration_s,
-                "reason": transfer_plan.reason,
-            } if transfer_plan else None,
+            "transfer_plan": None if plan is None else {
+                "from": plan.from_tank,
+                "to": plan.to_tank,
+                "mass_kg": plan.mass_kg,
+                "duration_s": plan.duration_s,
+                "reason": plan.reason,
+                "operational_authority": False,
+            },
             "total_boil_off_kgs": sum(t.boil_off_rate_kgs for t in tanks),
-            "worst_tank": balance["worst_tank"],
+            "operational_authority": False,
         }
 
     def get_boiloff_report(self, tanks: list[CryoTank]) -> dict:
         total_mass = sum(t.liquid_mass_kg for t in tanks)
-        total_boiloff = sum(t.boil_off_rate_kgs for t in tanks)
-        hours_to_5pct = (total_mass * 0.05 / total_boiloff * 3600) if total_boiloff > 0 else float("inf")
-
+        total_rate = sum(t.boil_off_rate_kgs for t in tanks)
+        hours_to_5pct = (total_mass * 0.05 / total_rate / 3600.0) if total_rate > 0 else None
         return {
             "total_propellant_kg": total_mass,
-            "total_boil_off_kgs": total_boiloff,
-            "boil_off_rate_per_hour": total_boiloff * 3600,
-            "time_to_5pct_loss_hours": hours_to_5pct / 3600,
+            "total_boil_off_kgs": total_rate,
+            "boil_off_rate_per_hour": total_rate * 3600.0,
+            "time_to_5pct_loss_hours": hours_to_5pct,
             "tank_count": len(tanks),
-            "tanks": {
-                t.tank_id: {
-                    "fill": t.fill_percent,
-                    "temp_k": t.temperature_k,
-                    "boil_rate_kgs": t.boil_off_rate_kgs,
-                }
-                for t in tanks
-            },
+            "tanks": {t.tank_id: {"fill": t.fill_percent, "temp_k": t.temperature_k, "boil_rate_kgs": t.boil_off_rate_kgs} for t in tanks},
+            "operational_authority": False,
         }

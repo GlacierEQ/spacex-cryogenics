@@ -1,14 +1,57 @@
-name: CI
+name: Native functional verification
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  ci:
-    uses: GlacierEQ/public-actions-runner-host/.github/workflows/reusable-quick-ci.yml@main
-    with:
-      repo_name: ${{ github.event.repository.name }}
-      language: python
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 observed in run 31638794805
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5 observed in run 31638794805
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e . pytest
+      - run: python -m compileall -q src tests
+      - run: pytest -q
+      - run: cryo-twin demo > /tmp/cryo-demo.json
+      - run: python -c 'import json; d=json.load(open("/tmp/cryo-demo.json")); assert d["schema"] == "glaciereq.cryogenic-digital-twin.v1"; assert d["operational_authority"] is False'
+
+  cpp:
+    name: C++17 thermodynamic reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 observed in run 31638794805
+        with:
+          persist-credentials: false
+      - run: g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic src/thermo_model.cpp -o /tmp/cryo-thermo
+      - run: /tmp/cryo-thermo | tee /tmp/cryo-thermo.out
+      - run: grep -q '^normal_bp_pressure_pa=101325.000000$' /tmp/cryo-thermo.out
+      - run: grep -q '^operational_authority=false$' /tmp/cryo-thermo.out
+
+  required-functional-proof:
+    if: always()
+    needs: [python, cpp]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require executable language boundaries
+        env:
+          PYTHON_RESULT: ${{ needs.python.result }}
+          CPP_RESULT: ${{ needs.cpp.result }}
+        run: |
+          test "$PYTHON_RESULT" = "success"
+          test "$CPP_RESULT" = "success"
