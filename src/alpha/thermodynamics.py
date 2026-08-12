@@ -1,6 +1,6 @@
 """Deterministic cryogenic thermodynamics for a local tank digital twin.
 
-The model is deliberately review-grade rather than flight-certified.  It uses a
+The model is deliberately review-grade rather than flight-certified. It uses a
 Clausius-Clapeyron approximation anchored at the normal boiling point, simple
 heat-leak balances, ideal-gas ullage calculations, and explicit SI units.
 """
@@ -155,6 +155,11 @@ class HeatTransfer:
         return self.conduction_watts + self.radiation_watts
 
 
+def clausius_clapeyron_slope(props: FluidProperties) -> float:
+    """Compatibility helper returning L_molar/R in kelvin."""
+    return props.latent_heat_j_mol / R_UNIVERSAL_J_MOL_K
+
+
 def saturation_pressure(props: FluidProperties, temp_k: float) -> float:
     """Approximate saturation pressure in Pa, anchored at the normal boiling point."""
     temp_k = float(temp_k)
@@ -162,7 +167,7 @@ def saturation_pressure(props: FluidProperties, temp_k: float) -> float:
         raise ValueError("temp_k must be finite and > 0")
     if temp_k >= props.critical_temp_k:
         return props.critical_pressure_pa
-    exponent = props.latent_heat_j_mol / R_UNIVERSAL_J_MOL_K * (
+    exponent = clausius_clapeyron_slope(props) * (
         1.0 / props.boiling_point_k - 1.0 / temp_k
     )
     return min(props.critical_pressure_pa, P_ATM_PA * math.exp(exponent))
@@ -197,12 +202,7 @@ def pressurization_rate(tank: TankState, heat_input_watts: float) -> float:
         return 0.0
     props = PROPELLANTS[tank.propellant]
     vapor_rate_kg_s = boil_off_rate(tank, heat_input_watts)
-    return (
-        vapor_rate_kg_s
-        * props.specific_gas_constant_j_kg_k
-        * tank.temperature_k
-        / tank.ullage_volume_m3
-    )
+    return vapor_rate_kg_s * props.specific_gas_constant_j_kg_k * tank.temperature_k / tank.ullage_volume_m3
 
 
 def ullage_pressurization(tank: TankState, target_pressure_pa: float) -> float:
