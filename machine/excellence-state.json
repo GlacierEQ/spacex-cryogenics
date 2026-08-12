@@ -1,196 +1,39 @@
 {
-  "schema": "glaciereq.repo-excellence-state.v1",
+  "schema": "glaciereq.repo-excellence-state.v2",
   "repository": "GlacierEQ/spacex-cryogenics",
-  "principal_state": "PROMOTED",
-  "gates": {
-    "IDENTITY_RESOLVED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "github GlacierEQ/spacex-cryogenics"
-    },
-    "PROBLEM_VERIFIED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "README/ISSUE_CONTRACT problem bound"
-    },
-    "TARGET_CONTRACT_FROZEN": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "machine/target-contract.json"
-    },
-    "DONOR_PLAN_RESOLVED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "elite bar seed; donor_reuse=none"
-    },
-    "VERTICAL_SLICE_ALIVE": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "src mechanism + scripts/operate.py"
-    },
-    "CENTRAL_MECHANISM_PRESENT": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "central mechanism in src/"
-    },
-    "DETERMINISTIC_PROOF_GREEN": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "dual-run green tests"
-    },
-    "ADVERSARIAL_SURVIVAL": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "tests/test_adversarial.py"
-    },
-    "OPERABLE_AND_OBSERVABLE": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "scripts/operate.py dual-run PASS; primary ok"
-    },
-    "PROOF_RECEIPT_BOUND": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "machine/proof_receipt.json bound"
-    },
-    "AUTHORITY_BOUND": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "promotion_authority.json local HMAC grant"
-    },
-    "PROJECTION_TRUTH_CLOSED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "proof=4b051f41d35f16d0; authority=2bba3b1d3a533c26; operability=bd03183ae544a2b5; claim_ceiling=leaf-native; nonclaims=non_affiliation_preserved; projection_role=monolith_projection_only; readback=operate_content_checked+validator_PASS"
-    },
-    "CANONICAL_POSITION_RESOLVED": {
-      "status": "PENDING"
-    },
-    "EVOLUTION_CURSOR_DEFINED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:25Z",
-      "evidence": "next:canonical_position_only_if_estate_role_resolved"
-    },
-    "problem_verified": true,
-    "unique_value_known": true,
-    "canonical_identity_known": true,
-    "central_mechanism_implemented": true,
-    "deterministic_tests_pass": true,
-    "adversarial_tests_pass": true,
-    "runtime_behavior_observed": true,
-    "security_authority_bounded": true,
-    "proof_receipt_bound_to_sha": true,
-    "reusable_capabilities_extracted": true,
-    "projections_truth_consistent": true,
-    "evolution_cursor_defined": true
+  "state": "FUNCTIONAL_CANDIDATE",
+  "principal_state": "FUNCTIONAL_CANDIDATE",
+  "evidence_state": "IMPLEMENTED_CURRENT_HEAD_NATIVE_PROOF_REQUIRED",
+  "supersedes": {
+    "prior_principal_state": "PROMOTED",
+    "reason": "legacy promotion was backed by generic governance receipts and placeholder proof identifiers while the README, thermodynamics, predictive transfer logic, and C++ build surface contained material functional defects"
   },
-  "history": [
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "DISCOVERED",
-      "to": "IDENTITY_RESOLVED",
-      "gate": "IDENTITY_RESOLVED",
-      "result": "PASS",
-      "note": "github GlacierEQ/spacex-cryogenics"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "IDENTITY_RESOLVED",
-      "to": "PROBLEM_VERIFIED",
-      "gate": "PROBLEM_VERIFIED",
-      "result": "PASS",
-      "note": "README/ISSUE_CONTRACT problem bound"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "PROBLEM_VERIFIED",
-      "to": "TARGET_CONTRACTED",
-      "gate": "TARGET_CONTRACT_FROZEN",
-      "result": "PASS",
-      "note": "machine/target-contract.json"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "TARGET_CONTRACTED",
-      "to": "SEEDED",
-      "gate": "DONOR_PLAN_RESOLVED",
-      "result": "PASS",
-      "note": "elite bar seed; donor_reuse=none"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "SEEDED",
-      "to": "VERTICAL_SLICE",
-      "gate": "VERTICAL_SLICE_ALIVE",
-      "result": "PASS",
-      "note": "src mechanism + scripts/operate.py"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "VERTICAL_SLICE",
-      "to": "IMPLEMENTED",
-      "gate": "CENTRAL_MECHANISM_PRESENT",
-      "result": "PASS",
-      "note": "central mechanism in src/"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "IMPLEMENTED",
-      "to": "TESTED",
-      "gate": "DETERMINISTIC_PROOF_GREEN",
-      "result": "PASS",
-      "note": "dual-run green tests"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "TESTED",
-      "to": "ADVERSARIAL_VERIFIED",
-      "gate": "ADVERSARIAL_SURVIVAL",
-      "result": "PASS",
-      "note": "tests/test_adversarial.py"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "ADVERSARIAL_VERIFIED",
-      "to": "OPERABLE",
-      "gate": "OPERABLE_AND_OBSERVABLE",
-      "result": "PASS",
-      "note": "scripts/operate.py dual-run PASS; primary ok"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "OPERABLE",
-      "to": "PROOF_REPRODUCED",
-      "gate": "PROOF_RECEIPT_BOUND",
-      "result": "PASS",
-      "note": "machine/proof_receipt.json bound"
-    },
-    {
-      "at": "2026-08-10T06:25Z",
-      "from": "PROOF_REPRODUCED",
-      "to": "PROMOTED",
-      "gate": "AUTHORITY_BOUND",
-      "result": "PASS",
-      "note": "promotion_authority + PROJECTION_TRUTH_CLOSED"
-    }
+  "implemented_capabilities": [
+    "si-consistent-cryogenic-thermodynamics",
+    "normal-boiling-point-saturation-model",
+    "ideal-gas-ullage-estimation",
+    "heat-leak-and-boiloff-simulation",
+    "bounded-tank-controller-digital-twin",
+    "sensor-residual-validation",
+    "predictive-multi-tank-boiloff",
+    "same-propellant-balance-review-planning",
+    "python-json-digital-twin-cli",
+    "cpp17-thermodynamic-reference-model"
   ],
-  "contract_ref": "machine/target-contract.json",
-  "scores_ref": "machine/excellence-scores.json",
-  "evolution_cursor": "next:canonical_position_only_if_estate_role_resolved",
-  "wave": {
-    "id": "ELITE-ESTATE-SCHEMA-MIGRATE-2026-08-10",
-    "proof_ok": true,
-    "operable_ok": true,
-    "migrated_at": "2026-08-10T05:56Z",
-    "from_schema": "glaciereq.repo-excellence.record.v1",
-    "history_repaired_at": "2026-08-10T06:12Z",
-    "history_source": "monolith-legal-hops",
-    "projection_truth_closed_at": "2026-08-10T06:25Z",
-    "policy": "glaciereq.repo-excellence.promotion-policy.v1"
+  "proof": {
+    "PYTHON_3_11": "REQUIRES_CURRENT_HEAD_CI",
+    "PYTHON_3_12": "REQUIRES_CURRENT_HEAD_CI",
+    "PYTHON_3_13": "REQUIRES_CURRENT_HEAD_CI",
+    "CPP17": "REQUIRES_CURRENT_HEAD_CI",
+    "REQUIRED_FUNCTIONAL_PROOF": "REQUIRES_CURRENT_HEAD_CI"
   },
-  "state": "PROMOTED",
-  "proof_receipt": {
-    "source_sha": "HYPER_VALIDATED_SHA256",
-    "identity": "HYPER_VALIDATED_IDENTITY"
-  }
+  "nonclaims": [
+    "no SpaceX affiliation",
+    "no flight certification",
+    "no hardware I/O",
+    "no operational valve or loading authority",
+    "no live MCP or APEX integration",
+    "no trained LSTM or autoencoder model"
+  ],
+  "evolution_cursor": "next:exact_head_native_proof_then_portfolio_admission"
 }
