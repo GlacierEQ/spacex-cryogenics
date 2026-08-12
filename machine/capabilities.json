@@ -1,1 +1,23 @@
-{"capabilities": ["hyper-scaling"]}
+{
+  "schema": "glaciereq.capabilities.v2",
+  "capabilities": [
+    "si-consistent-cryogenic-thermodynamics",
+    "normal-boiling-point-saturation-model",
+    "ideal-gas-ullage-estimation",
+    "heat-leak-and-boiloff-simulation",
+    "bounded-tank-controller-digital-twin",
+    "sensor-residual-validation",
+    "predictive-multi-tank-boiloff",
+    "same-propellant-balance-review-planning",
+    "python-json-digital-twin-cli",
+    "cpp17-thermodynamic-reference-model"
+  ],
+  "nonclaims": [
+    "no SpaceX affiliation",
+    "no flight certification",
+    "no hardware I/O",
+    "no operational valve or loading authority",
+    "no live MCP or APEX integration",
+    "no trained LSTM or autoencoder model"
+  ]
+}
