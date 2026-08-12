@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glaciereq-cryogenic-twin"
+version = "1.0.0"
+description = "Deterministic cryogenic propellant digital-twin simulation toolkit"
+requires-python = ">=3.11"
+license = { text = "LicenseRef-GlacierEQ-Proprietary-1.1" }
+authors = [{ name = "GlacierEQ" }]
+
+[project.scripts]
+cryo-twin = "cryo_engine:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["cryo_engine", "boiloff"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
+include = ["alpha*", "omega*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
